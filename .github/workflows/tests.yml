@@ -1,0 +1,47 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run the unit tests
+        run: pytest -q
+
+      - name: Analyse the bundled sample
+        # The sample is deliberately out of control, so the CLI exits 1 here.
+        run: |
+          python -m spc data/shaft-diameter.csv --lsl 11.970 --usl 12.030 \
+            --chart out/control-chart.png --report out/summary.txt || true
+
+      - name: Upload the generated chart and report
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-analysis
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
